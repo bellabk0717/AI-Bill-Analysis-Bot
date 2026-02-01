@@ -20,7 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# 虚拟环境
+# Virtual Environment
 venv/
 ENV/
 env/
@@ -30,7 +30,7 @@ env/
 instance/
 .webassets-cache
 
-# 环境变量
+# Environment Variables
 .env
 
 # IDE
@@ -43,11 +43,11 @@ instance/
 # Claude Code
 .claude/
 
-# 操作系统
+# Operating System
 .DS_Store
 Thumbs.db
 
-# 上传的文件
+# Uploads
 uploads/
 *.pdf
 
@@ -55,7 +55,7 @@ uploads/
 *.db
 finsight.db
 
-# 日志
+# Logs
 *.log
 
 # Documents
