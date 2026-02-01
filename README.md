@@ -29,6 +29,10 @@ Upload your bank statement → AI extracts transactions → Get spending insight
 
 ---
 
+## Product demo:
+<img width="3150" height="1710" alt="page1" src="https://github.com/user-attachments/assets/7b93a289-7169-4213-b7d8-9cdbbe531f46" />
+
+
 ## Quick Start
 
 ```bash
