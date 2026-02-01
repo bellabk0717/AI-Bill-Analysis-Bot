@@ -30,8 +30,27 @@ Upload your bank statement → AI extracts transactions → Get spending insight
 ---
 
 ## Product demo:
+
+1. **Login** 
+<img width="3100" height="1678" alt="login page" src="https://github.com/user-attachments/assets/50a86b56-e74a-402e-8057-ff549464594f" />
+2. **Main page** 
 <img width="3150" height="1710" alt="page1" src="https://github.com/user-attachments/assets/7b93a289-7169-4213-b7d8-9cdbbe531f46" />
 
+<img width="3152" height="1708" alt="page2" src="https://github.com/user-attachments/assets/1a8515d9-8c11-4fd5-8a2a-f3ed8e94c09d" />
+
+<img width="3142" height="1712" alt="3" src="https://github.com/user-attachments/assets/2c831311-d99d-4e14-85da-1487b4c08604" />
+3. **Analysis results** 
+<img width="3106" height="1708" alt="4" src="https://github.com/user-attachments/assets/8e4f677d-67c6-414e-adde-da78cc2c9d19" />
+
+<img width="3088" height="994" alt="5" src="https://github.com/user-attachments/assets/dbdca6b4-51c5-4cd4-9099-8674ba82dadf" />
+
+<img width="3022" height="1416" alt="6" src="https://github.com/user-attachments/assets/147ef2c5-f03c-4693-adbe-c2c53f6dd5dc" />
+
+<img width="3114" height="1684" alt="7" src="https://github.com/user-attachments/assets/d5767192-5699-413d-8e2c-18067c0ef582" />
+4. **Export as PDF** 
+<img width="3172" height="1720" alt="8" src="https://github.com/user-attachments/assets/6d2477d6-0886-40d6-bec0-e8e8dea04780" />
+5. **Chat bot** 
+<img width="1022" height="1346" alt="9" src="https://github.com/user-attachments/assets/1f0e2588-54be-4f62-9064-a4f2a64ba268" />
 
 ## Quick Start
 
