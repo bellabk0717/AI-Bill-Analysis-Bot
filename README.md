@@ -4,8 +4,11 @@
 
 Upload your bank statement → AI extracts transactions → Get spending insights & charts
 Explore it on Render : 
+
 https://ai-bill-analysis-and-chat-bot.onrender.com
+
 Has set the API Limits, might hit the limits, so better deploy it by yourself.
+
 ---
 
 ## What It Does
