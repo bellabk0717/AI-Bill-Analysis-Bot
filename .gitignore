@@ -57,3 +57,6 @@ finsight.db
 
 # 日志
 *.log
+
+# Documents
+*.docx
