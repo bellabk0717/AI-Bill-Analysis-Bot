@@ -174,4 +174,30 @@ Flask · SQLite · OpenAI GPT-4o · Chart.js · pdfplumber
 
 ---
 
-**MIT License** | Powered by OpenAI
+## Reflections on AI-Assisted Development
+
+This project was built with [Claude Code](https://claude.ai/code) as my AI programming partner. From architecture design to debugging, from writing code to crafting documentation — Claude was there every step of the way.
+
+### The Shifting Role of Humans
+
+**Before AI:** Product managers were the *bridge* between users and developers. They translated needs into specs, specs into tasks.
+
+**Now:** Product managers become the *first users* of the product. With AI handling implementation, we spend less time coordinating and more time experiencing, testing, and refining what we build.
+
+### What This Means
+
+| Before | After |
+|--------|-------|
+| "Write a spec for developers" | "Build it with AI, then iterate" |
+| Weeks of development cycles | Hours from idea to prototype |
+| Expertise gatekeeping | Creativity democratization |
+
+### A New Partnership
+
+AI doesn't replace human judgment — it amplifies human creativity. I still decided *what* to build and *why*. Claude helped me figure out *how*, faster than I ever could alone.
+
+The future isn't human vs. AI. It's human *with* AI.
+
+---
+
+**MIT License** | Powered by OpenAI | Built with Claude
