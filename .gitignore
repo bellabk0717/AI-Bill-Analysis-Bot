@@ -51,5 +51,9 @@ Thumbs.db
 uploads/
 *.pdf
 
+# Database
+*.db
+finsight.db
+
 # 日志
 *.log

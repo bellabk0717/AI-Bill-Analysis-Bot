@@ -854,3 +854,365 @@ function formatAmountWithSign(amount) {
         return '$0.00';
     }
 }
+
+// ==========================================
+// Chat Widget Functions
+// ==========================================
+
+let isChatOpen = false;
+let isChatLoading = false;
+
+// === Toggle Chat Window === //
+function toggleChat() {
+    const chatWindow = document.getElementById('chatWindow');
+    const chatIcon = document.querySelector('.chat-icon');
+    const closeIcon = document.querySelector('.close-icon');
+    const chatBadge = document.getElementById('chatBadge');
+
+    isChatOpen = !isChatOpen;
+
+    if (isChatOpen) {
+        chatWindow.style.display = 'flex';
+        chatIcon.style.display = 'none';
+        closeIcon.style.display = 'block';
+        chatBadge.style.display = 'none';
+        // Focus on input
+        setTimeout(() => {
+            document.getElementById('chatInput').focus();
+        }, 100);
+    } else {
+        chatWindow.style.display = 'none';
+        chatIcon.style.display = 'block';
+        closeIcon.style.display = 'none';
+    }
+}
+
+// === Handle Enter Key in Chat Input === //
+function handleChatKeypress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+    }
+}
+
+// === Send Chat Message === //
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+
+    if (!message || isChatLoading) return;
+
+    // Clear input
+    input.value = '';
+
+    // Add user message to chat
+    addChatMessage(message, 'user');
+
+    // Show loading indicator
+    isChatLoading = true;
+    const loadingId = addChatLoading();
+
+    try {
+        // Prepare context if financial data is available
+        const context = currentReportData ? {
+            summary: currentReportData.summary,
+            categories: currentReportData.categories,
+            transactions: currentReportData.transactions
+        } : null;
+
+        // Send request to backend
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: message,
+                context: context
+            })
+        });
+
+        const data = await response.json();
+
+        // Remove loading indicator
+        removeChatLoading(loadingId);
+
+        if (response.ok) {
+            addChatMessage(data.reply, 'bot');
+        } else {
+            addChatMessage('Sorry, I encountered an error. Please try again.', 'bot', true);
+        }
+
+    } catch (error) {
+        console.error('Chat error:', error);
+        removeChatLoading(loadingId);
+        addChatMessage('Sorry, I couldn\'t connect to the server. Please try again.', 'bot', true);
+    }
+
+    isChatLoading = false;
+}
+
+// === Add Message to Chat === //
+function addChatMessage(content, sender, isError = false) {
+    const messagesContainer = document.getElementById('chatMessages');
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${sender}${isError ? ' error' : ''}`;
+
+    if (sender === 'bot') {
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                </svg>
+            </div>
+            <div class="message-content">${formatChatMessage(content)}</div>
+        `;
+    } else {
+        messageDiv.innerHTML = `
+            <div class="message-content">${escapeHtml(content)}</div>
+        `;
+    }
+
+    messagesContainer.appendChild(messageDiv);
+
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// === Add Loading Indicator === //
+function addChatLoading() {
+    const messagesContainer = document.getElementById('chatMessages');
+
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'chat-message bot loading';
+    loadingDiv.id = 'chatLoading';
+    loadingDiv.innerHTML = `
+        <div class="message-avatar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+            </svg>
+        </div>
+        <div class="message-content">
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    `;
+
+    messagesContainer.appendChild(loadingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    return 'chatLoading';
+}
+
+// === Remove Loading Indicator === //
+function removeChatLoading(id) {
+    const loadingDiv = document.getElementById(id);
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
+// === Format Chat Message (Markdown-like) === //
+function formatChatMessage(text) {
+    if (!text) return '';
+
+    let html = escapeHtml(text);
+
+    // Convert markdown-style formatting
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Bullet lists
+    html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+    // Numbered lists
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    // Clean up multiple br tags
+    html = html.replace(/(<br>){3,}/g, '<br><br>');
+
+    return html;
+}
+
+// === Escape HTML === //
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ==========================================
+// History Functions
+// ==========================================
+
+let isHistoryOpen = false;
+
+// === Toggle History Modal === //
+function toggleHistory() {
+    const overlay = document.getElementById('historyOverlay');
+    isHistoryOpen = !isHistoryOpen;
+
+    if (isHistoryOpen) {
+        overlay.classList.add('active');
+        loadHistory();
+    } else {
+        overlay.classList.remove('active');
+    }
+}
+
+// === Close History Modal on overlay click === //
+function closeHistoryModal(event) {
+    if (event.target.id === 'historyOverlay') {
+        toggleHistory();
+    }
+}
+
+// === Load History from API === //
+async function loadHistory() {
+    const content = document.getElementById('historyContent');
+
+    content.innerHTML = `
+        <div class="history-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading history...</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/history');
+        const data = await response.json();
+
+        if (response.ok) {
+            renderHistory(data.history);
+        } else {
+            content.innerHTML = `<div class="history-empty">Failed to load history</div>`;
+        }
+    } catch (error) {
+        console.error('History error:', error);
+        content.innerHTML = `<div class="history-empty">Failed to load history</div>`;
+    }
+}
+
+// === Render History List === //
+function renderHistory(history) {
+    const content = document.getElementById('historyContent');
+
+    if (!history || history.length === 0) {
+        content.innerHTML = `
+            <div class="history-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <p>No analysis history yet</p>
+                <span>Upload a bank statement to get started</span>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div class="history-list">';
+
+    history.forEach(item => {
+        const date = new Date(item.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        html += `
+            <div class="history-item" data-id="${item.id}">
+                <div class="history-item-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                </div>
+                <div class="history-item-info">
+                    <div class="history-item-name">${escapeHtml(item.filename)}</div>
+                    <div class="history-item-meta">
+                        <span>${date}</span>
+                        <span class="history-item-balance">$${item.start_balance.toFixed(2)} → $${item.end_balance.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="history-item-actions">
+                    <button class="history-view-btn" onclick="loadHistoryDetail(${item.id})" title="View">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                    <button class="history-delete-btn" onclick="deleteHistoryItem(${item.id})" title="Delete">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    content.innerHTML = html;
+}
+
+// === Load History Detail === //
+async function loadHistoryDetail(id) {
+    try {
+        const response = await fetch(`/history/${id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            // Close history modal
+            toggleHistory();
+
+            // Store data for export
+            currentReportData = data;
+            currentReportMarkdown = data.report;
+
+            // Render data
+            renderData(data);
+        } else {
+            alert('Failed to load analysis detail');
+        }
+    } catch (error) {
+        console.error('Load detail error:', error);
+        alert('Failed to load analysis detail');
+    }
+}
+
+// === Delete History Item === //
+async function deleteHistoryItem(id) {
+    if (!confirm('Are you sure you want to delete this analysis?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/history/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            // Reload history list
+            loadHistory();
+        } else {
+            alert('Failed to delete analysis');
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        alert('Failed to delete analysis');
+    }
+}

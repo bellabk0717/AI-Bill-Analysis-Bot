@@ -9,10 +9,11 @@ Usage:
 3. Run: python app_with_api.py
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import json
 import os
 import base64
+import sqlite3
 from datetime import datetime
 from dotenv import load_dotenv
 import pdfplumber
@@ -23,6 +24,117 @@ import httpx
 load_dotenv(override=True)
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'finsight-premium-secret-key-2025')
+
+# ==========================================
+# Database Configuration
+# ==========================================
+
+DATABASE = 'finsight.db'
+
+
+def get_db():
+    """Get database connection"""
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    """Initialize database tables"""
+    conn = get_db()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS analysis_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            summary TEXT,
+            categories TEXT,
+            transactions TEXT,
+            report TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+
+def save_analysis(username, filename, data):
+    """Save analysis result to database"""
+    conn = get_db()
+    conn.execute('''
+        INSERT INTO analysis_history (username, filename, summary, categories, transactions, report)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        username,
+        filename,
+        json.dumps(data.get('summary', {})),
+        json.dumps(data.get('categories', {})),
+        json.dumps(data.get('transactions', [])),
+        data.get('report', '')
+    ))
+    conn.commit()
+    conn.close()
+
+
+def get_user_history(username, limit=20):
+    """Get analysis history for a user"""
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT id, filename, created_at, summary
+        FROM analysis_history
+        WHERE username = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+    ''', (username, limit)).fetchall()
+    conn.close()
+
+    history = []
+    for row in rows:
+        summary = json.loads(row['summary']) if row['summary'] else {}
+        history.append({
+            'id': row['id'],
+            'filename': row['filename'],
+            'created_at': row['created_at'],
+            'start_balance': summary.get('start_balance', 0),
+            'end_balance': summary.get('end_balance', 0)
+        })
+    return history
+
+
+def get_analysis_detail(analysis_id, username):
+    """Get full analysis detail by ID"""
+    conn = get_db()
+    row = conn.execute('''
+        SELECT * FROM analysis_history
+        WHERE id = ? AND username = ?
+    ''', (analysis_id, username)).fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        'id': row['id'],
+        'filename': row['filename'],
+        'created_at': row['created_at'],
+        'summary': json.loads(row['summary']) if row['summary'] else {},
+        'categories': json.loads(row['categories']) if row['categories'] else {},
+        'transactions': json.loads(row['transactions']) if row['transactions'] else [],
+        'report': row['report']
+    }
+
+
+def delete_analysis(analysis_id, username):
+    """Delete analysis record"""
+    conn = get_db()
+    conn.execute('DELETE FROM analysis_history WHERE id = ? AND username = ?', (analysis_id, username))
+    conn.commit()
+    conn.close()
+
+
+# Initialize database on startup
+init_db()
 
 # ==========================================
 # Fixed Categories Definition
@@ -140,6 +252,24 @@ Your financial summary for this period:
 1. **Expense Management**: ...
 2. **Savings Planning**: ...
 3. **Financial Tracking**: ...
+"""
+
+CHAT_SYSTEM_PROMPT = """You are FinSight AI Assistant, a helpful financial advisor chatbot. You help users understand their finances and answer questions about banking, budgeting, and financial planning.
+
+Guidelines:
+1. Be friendly, professional, and concise
+2. If the user has uploaded a bank statement (context provided), reference their specific data when relevant
+3. For general financial questions, provide helpful advice
+4. Use simple language, avoid jargon
+5. If you don't know something, say so honestly
+6. Keep responses under 150 words unless more detail is needed
+7. You can use markdown formatting for better readability
+
+If financial data context is provided, you can:
+- Answer questions about their spending patterns
+- Explain specific transactions
+- Provide personalized budgeting tips
+- Compare their spending to typical patterns
 """
 
 # ==========================================
@@ -473,8 +603,29 @@ def validate_data(data):
 
 @app.route('/')
 def index():
-    """Home page"""
-    return render_template('index.html')
+    """Home page - requires login"""
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('index.html', username=session['username'])
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Simple login - just enter your name"""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        if username:
+            session['username'] = username
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Please enter your name')
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    """Logout and clear session"""
+    session.pop('username', None)
+    return redirect(url_for('login'))
 
 
 @app.route('/upload', methods=['POST'])
@@ -549,6 +700,11 @@ def upload():
         report = generate_ai_report(data)
         data['report'] = report
 
+        # Save to database if user is logged in
+        if 'username' in session:
+            save_analysis(session['username'], file.filename, data)
+            print(f"[DB] Analysis saved for user: {session['username']}")
+
         print("[OK] Processing complete")
         return jsonify(data), 200
 
@@ -565,8 +721,104 @@ def health():
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
         "api_configured": bool(os.getenv('OPENAI_API_KEY')),
-        "features": ["pdf", "image"]
+        "features": ["pdf", "image", "chat", "history"]
     })
+
+
+@app.route('/history')
+def history():
+    """Get user's analysis history"""
+    if 'username' not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    history_list = get_user_history(session['username'])
+    return jsonify({"history": history_list}), 200
+
+
+@app.route('/history/<int:analysis_id>')
+def history_detail(analysis_id):
+    """Get specific analysis detail"""
+    if 'username' not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    detail = get_analysis_detail(analysis_id, session['username'])
+    if not detail:
+        return jsonify({"error": "Analysis not found"}), 404
+
+    return jsonify(detail), 200
+
+
+@app.route('/history/<int:analysis_id>', methods=['DELETE'])
+def history_delete(analysis_id):
+    """Delete an analysis record"""
+    if 'username' not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    delete_analysis(analysis_id, session['username'])
+    return jsonify({"success": True}), 200
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """
+    AI Chatbot endpoint for financial assistance
+    Accepts: { "message": "user message", "context": optional financial data }
+    Returns: { "reply": "AI response" }
+    """
+
+    if not os.getenv('OPENAI_API_KEY'):
+        return jsonify({"error": "OPENAI_API_KEY not configured"}), 500
+
+    try:
+        data = request.get_json()
+
+        if not data or 'message' not in data:
+            return jsonify({"error": "Message is required"}), 400
+
+        user_message = data['message'].strip()
+
+        if not user_message:
+            return jsonify({"error": "Message cannot be empty"}), 400
+
+        # Build context from financial data if available
+        context_info = ""
+        if 'context' in data and data['context']:
+            ctx = data['context']
+            context_info = f"""
+
+User's Financial Data Context:
+- Opening Balance: ${ctx.get('summary', {}).get('start_balance', 'N/A')}
+- Closing Balance: ${ctx.get('summary', {}).get('end_balance', 'N/A')}
+- Total Income: ${ctx.get('summary', {}).get('total_income', 'N/A')}
+- Total Expenses: ${ctx.get('summary', {}).get('total_expense', 'N/A')}
+- Number of Transactions: {len(ctx.get('transactions', []))}
+- Top Spending Categories: {', '.join([f"{k}: ${v:.2f}" for k, v in sorted(ctx.get('categories', {}).items(), key=lambda x: x[1], reverse=True)[:3]])}
+"""
+
+        # Call OpenAI API
+        response = get_openai_client().chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": CHAT_SYSTEM_PROMPT + context_info
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+
+        reply = response.choices[0].message.content
+
+        return jsonify({"reply": reply}), 200
+
+    except Exception as e:
+        print(f"[Chat Error] {str(e)}")
+        return jsonify({"error": f"Chat failed: {str(e)}"}), 500
 
 
 # ==========================================
